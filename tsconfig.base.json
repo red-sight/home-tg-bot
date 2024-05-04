@@ -25,6 +25,7 @@
     "sourceMap": true,
     "strict": true,
     "target": "ES6",
-    "useUnknownInCatchVariables": true
+    "useUnknownInCatchVariables": true,
+    "skipLibCheck": true
   }
 }

@@ -12,3 +12,57 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model TgChat {
+  id        String   @id @default(uuid())
+  chatId    String
+  active    Boolean
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DhcpLease {
+  id                String             @id @default(uuid())
+  name              String
+  ownerName         String?
+  dhcpName          String
+  dhcpIp            String
+  dhcpMac           String             @unique
+  dhcpDesc          String?
+  watch             Boolean            @default(false)
+  lastStatus        Boolean
+  lastConnected     DateTime           @default(now())
+  lastDisconnected  DateTime           @default(now())
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  router            String
+  DhcpLeaseHistory  DhcpLeaseHistory[]
+  DhcpLeaseStatuses DhcpLeaseStatus[]
+}
+
+model RouterStatus {
+  id         String   @id @default(uuid())
+  routerName String
+  status     Boolean
+  error      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model DhcpLeaseHistory {
+  id          String    @id @default(uuid())
+  dhcpLeaseId String
+  dhcpLease   DhcpLease @relation(fields: [dhcpLeaseId], references: [id])
+  status      Boolean
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model DhcpLeaseStatus {
+  id          String    @id @default(uuid())
+  dhcpLeaseId String
+  dhcpLease   DhcpLease @relation(fields: [dhcpLeaseId], references: [id])
+  status      Boolean
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}

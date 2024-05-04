@@ -1,0 +1,24 @@
+{
+  "name": "@apps/tg-bot",
+  "packageManager": "yarn@4.1.1",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "start": "node dist",
+    "start:dev": "nodemon"
+  },
+  "dependencies": {
+    "@grammyjs/i18n": "^1.0.2",
+    "@packages/config": "workspace:^",
+    "@packages/flow": "workspace:^",
+    "@telegraf/entity": "^0.5.0",
+    "bullmq": "^5.7.7",
+    "grammy": "^1.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "@types/node-fetch": "^2.6.11",
+    "nodemon": "^3.1.0",
+    "typescript": "^5.4.5"
+  }
+}

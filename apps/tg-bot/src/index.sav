@@ -1,0 +1,142 @@
+import { config } from '@packages/config';
+import {
+  IDhcpLeaseQueueData,
+  IDhcpLeaseStatusQueueData,
+  INewGroupQueueData,
+  dhcpLeaseStatusQueue,
+  newDhcpLeaseQueue,
+  newGroupQueue,
+  newGroupQueueProcessed,
+} from '@packages/queue';
+import { Job, Worker } from 'bullmq';
+import { Bot, Context } from 'grammy';
+import { escapers } from '@telegraf/entity';
+import { I18n, I18nFlavor, TranslationVariables } from '@grammyjs/i18n';
+
+type BotContext = Context & I18nFlavor;
+
+const token = config.tgBot.token;
+if (!token) throw new Error('Telegram bot token config is not defined');
+
+const ownerStr = config.tgBot.owner;
+if (!ownerStr) throw new Error('Telegram bot owner config is not defined');
+const owner = parseInt(ownerStr);
+if (isNaN(owner)) throw new Error('Failed to parse Telegram bot owner config');
+
+const connection = config.redis;
+if (!connection) throw new Error('Redis connection is not configured');
+
+const bot = new Bot<BotContext>(token);
+
+const locale = 'ru';
+
+const i18n = new I18n<BotContext>({
+  defaultLocale: locale, // see below for more information
+  directory: 'locales', // Load all translation files from locales/.
+});
+bot.use(i18n);
+
+bot.command('start', ctx => ctx.reply(ctx.t('start_command_reply')));
+
+bot.on(':new_chat_members:me', async ctx => {
+  if (ctx.message?.from.id !== owner && ctx.message?.chat.type !== 'private') {
+    await ctx.reply(
+      `Sorry, @${ctx.message?.from.username} you do not have privilegies to add me into group chats`
+    );
+    await ctx.leaveChat();
+  } else {
+    console.dir(ctx.message, { depth: null, colors: true });
+    await ctx.reply('Hi there!');
+    await newGroupQueue.queue.add(ctx.message.chat.id.toString(), {
+      id: ctx.message.chat.id,
+    });
+  }
+});
+
+new Worker(
+  newGroupQueueProcessed.name,
+  async (job: Job<INewGroupQueueData>) => {
+    await bot.api.sendMessage(job.data.id, t('bot_inititated'));
+  },
+  { connection }
+);
+
+new Worker(
+  newDhcpLeaseQueue.name,
+  async (job: Job<IDhcpLeaseQueueData>) => {
+    const { chats, lease } = job.data;
+    escapeObj(lease);
+    chats.every(async chat => {
+      const chatId = chat.chatId;
+      escapeObj(chat);
+      await bot.api.sendMessage(
+        chatId,
+        t('new_lease', {
+          name: lease.dhcpName,
+          router: lease.router,
+          ip: lease.dhcpName,
+          mac: lease.dhcpMac,
+          desc: lease.dhcpDesc || '',
+        }),
+        {
+          parse_mode: 'MarkdownV2',
+        }
+      );
+    });
+    return Promise.resolve(true);
+  },
+  { connection }
+);
+
+new Worker(
+  dhcpLeaseStatusQueue.name,
+  async (job: Job<IDhcpLeaseStatusQueueData>) => {
+    const { chats, lease, status, time } = job.data;
+    escapeObj(lease);
+    chats.every(async chat => {
+      const chatId = chat.chatId;
+      escapeObj(chat);
+
+      const tCode = status ? 'lease_connected' : 'lease_disconnected';
+      const tVars = {
+        name: lease.name,
+        router: lease.router,
+        time,
+      };
+
+      const md = t(tCode, tVars);
+
+      await bot.api.sendMessage(chatId, md, {
+        parse_mode: 'MarkdownV2',
+      });
+    });
+    return Promise.resolve(true);
+  },
+  { connection }
+);
+
+bot.start().catch(e => {
+  console.error(e);
+});
+
+function escape(text: string): string {
+  return escapers.MarkdownV2(text);
+}
+
+function escapeObj(obj: {
+  [key: string]: string | number | undefined | null | Date | boolean;
+}) {
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (typeof val === 'string') obj[key] = escape(val);
+  }
+}
+
+function t(key: string, variables?: TranslationVariables<string> | undefined) {
+  if (variables)
+    for (const key of Object.keys(variables)) {
+      const val = variables[key];
+      if (val) variables[key] = String(val);
+    }
+  return i18n.t(locale, key, variables);
+}

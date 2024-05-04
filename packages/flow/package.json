@@ -1,5 +1,5 @@
 {
-  "name": "@packages/devices",
+  "name": "@packages/flow",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "packageManager": "yarn@4.1.1",
@@ -7,13 +7,13 @@
     "start:dev": "nodemon"
   },
   "devDependencies": {
-    "@packages/types": "workspace:^",
     "@types/node": "^20.12.7",
-    "@types/ssh2": "^1.15.0",
     "nodemon": "^3.1.0",
     "typescript": "^5.4.5"
   },
   "dependencies": {
-    "node-ssh": "^13.2.0"
+    "@packages/config": "workspace:^",
+    "@packages/db": "workspace:^",
+    "bullmq": "^5.7.7"
   }
 }

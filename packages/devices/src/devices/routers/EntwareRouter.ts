@@ -1,6 +1,7 @@
 import { ERouterType } from '@packages/types';
 import { Router } from '../Router';
 import { Config, NodeSSH, SSHExecCommandOptions } from 'node-ssh';
+import { IRouterLease } from '@packages/types';
 
 interface IEntwareRouterOpts extends Config {
   name: string;
@@ -10,7 +11,7 @@ interface IEntwareRouterOpts extends Config {
 export class EntwareRouter extends Router {
   private config: Config;
   public connection?: NodeSSH;
-  private name: string;
+  public name: string;
   public ssh: NodeSSH = new NodeSSH();
   private supressWarnings: boolean;
 
@@ -48,21 +49,19 @@ export class EntwareRouter extends Router {
     return res;
   }
 
-  public async listLeases() {
+  public async listLeases(): Promise<IRouterLease[]> {
     const res = await this.request(
       "arp-scan --interface=br0 --localnet -d --format='${ip}\t${name}\t${mac}\t${vendor}'"
     );
-    return res.stdout
+    const leases: IRouterLease[] = [];
+    res.stdout
       .split('\n')
       .slice(2, -3)
-      .map(line => {
+      .forEach(line => {
         const arr = line.split('\t');
-        return {
-          ip: arr[0],
-          name: arr[1],
-          mac: arr[2],
-          desc: arr[3],
-        };
+        const [ip, name, mac, desc] = arr;
+        if (ip && name && mac) leases.push({ ip, name, mac, desc });
       });
+    return leases;
   }
 }

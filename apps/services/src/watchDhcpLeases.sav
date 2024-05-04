@@ -1,0 +1,160 @@
+import { IRouterConfig, config } from '@packages/config';
+import { ERouterType } from '@packages/types';
+import { EntwareRouter } from '@packages/devices';
+import { Processor, Queue, Worker } from 'bullmq';
+import { prisma } from '@packages/db';
+import { dhcpLeaseStatusQueue, newDhcpLeaseQueue } from '@packages/queue';
+import { randomUUID } from 'crypto';
+import { formatDistance } from 'date-fns';
+import { ru } from 'date-fns/locale';
+
+const routers = config.routers;
+
+routers.every(async router => {
+  if (router.type === ERouterType.entware) await processEntware(router);
+});
+
+async function processEntware(router: IRouterConfig) {
+  const { host, name, username, privateKey, dhcpLeaseCheckTimeout } = router;
+  const entwareRouter = new EntwareRouter({
+    name,
+    host,
+    username,
+    privateKey,
+    supressWarnings: true,
+  });
+
+  const chats = await prisma.tgChat.findMany({ where: { active: true } });
+
+  const queueName = `router:${name}`;
+  const queue = new Queue(queueName, {
+    connection: config.redis,
+  });
+
+  async function isLeaseHistoricallyActive(id: string): Promise<boolean> {
+    const history = await prisma.dhcpLeaseHistory.findMany({
+      where: {
+        id,
+      },
+      orderBy: [
+        {
+          createdAt: 'desc',
+        },
+      ],
+      take: 12,
+    });
+    return !!history.find(record => !!record.status);
+  }
+
+  const processRouter: Processor = async function () {
+    try {
+      await entwareRouter.connect();
+      const routerLeases = await entwareRouter.listLeases();
+      const dbLeases = await prisma.dhcpLease.findMany({
+        where: {
+          router: name,
+        },
+      });
+      // check new leases
+      routerLeases
+        .filter(
+          lease =>
+            lease.mac && !dbLeases.map(l => l.dhcpMac).includes(lease.mac)
+        )
+        .every(async lease => {
+          const dbLease = await prisma.dhcpLease.create({
+            data: {
+              name: lease.name,
+              dhcpName: lease.name,
+              dhcpIp: lease.ip,
+              dhcpMac: lease.mac,
+              dhcpDesc: lease.desc || '',
+              lastStatus: true,
+              router: name,
+            },
+          });
+
+          await newDhcpLeaseQueue.queue.add(randomUUID(), {
+            lease: dbLease,
+            chats,
+          });
+        });
+      // check leases status
+      dbLeases.every(async lease => {
+        const leaseActive = routerLeases.find(l => l.ip === lease.dhcpIp);
+        // const leaseActive = await isLeaseActive(lease.id)
+        const statusChanged = lease.lastStatus !== !!leaseActive;
+        // await prisma.dhcpLease.update({
+        //   where: {
+        //     dhcpMac: lease.dhcpMac,
+        //     router: name,
+        //   },
+        //   data: {
+        //     lastStatus: !!leaseActive,
+        //     lastConnected: leaseActive ? new Date() : lease.lastConnected,
+        //     lastDisconnected: leaseActive ? lease.lastDisconnected : new Date(),
+        //   },
+        // });
+        await prisma.dhcpLeaseHistory.create({
+          data: {
+            dhcpLeaseId: lease.id,
+            status: !!leaseActive,
+          },
+        });
+
+        const leaseHistoricallyActive = await isLeaseHistoricallyActive(
+          lease.id
+        );
+
+        if (
+          statusChanged &&
+          lease.watch &&
+          leaseHistoricallyActive !== !!leaseActive
+        ) {
+          await prisma.dhcpLease.update({
+            where: {
+              dhcpMac: lease.dhcpMac,
+              router: name,
+            },
+            data: {
+              lastStatus: !!leaseActive,
+              lastConnected: leaseActive ? new Date() : lease.lastConnected,
+              lastDisconnected: leaseActive
+                ? lease.lastDisconnected
+                : new Date(),
+            },
+          });
+          const time = formatDistance(
+            leaseActive ? lease.lastDisconnected : lease.lastConnected,
+            new Date(),
+            { includeSeconds: true, locale: ru }
+          );
+          await dhcpLeaseStatusQueue.queue.add(randomUUID(), {
+            lease,
+            chats,
+            status: !!leaseActive,
+            time,
+          });
+        }
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  new Worker(queueName, processRouter, {
+    connection: config.redis,
+    limiter: {
+      max: 1,
+      duration: dhcpLeaseCheckTimeout,
+    },
+  });
+
+  await queue.add(
+    `watch-router-leases:${name}`,
+    {},
+    {
+      repeat: { every: dhcpLeaseCheckTimeout },
+    }
+  );
+}

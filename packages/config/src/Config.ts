@@ -1,7 +1,5 @@
 import { IConfig } from './config.types';
 import * as configs from './config';
-import dotenv from 'dotenv';
-dotenv.config({ path: `../../../.env` });
 
 export class Config {
   public config: IConfig;

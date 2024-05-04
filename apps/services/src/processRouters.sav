@@ -1,0 +1,45 @@
+import { IRouterConfig, config } from '@packages/config';
+import { ERouterType } from '@packages/types';
+import { EntwareRouter } from '@packages/devices';
+import { prisma } from '@packages/db';
+// import { serializeError } from 'serialize-error';
+
+const routerConfigs = config.routers;
+
+routerConfigs.every(async routerConfig => {
+  switch (routerConfig.type) {
+    default:
+      break;
+    case ERouterType.entware:
+      await processEntware(routerConfig);
+      break;
+  }
+});
+
+async function processEntware(routerConfig: IRouterConfig): Promise<void> {
+  const { dhcpLeaseCheckTimeout, ...config } = routerConfig;
+  const router = new EntwareRouter({ ...config, supressWarnings: true });
+
+  let status = true;
+  let routerConnectionError: string = '';
+
+  try {
+    await router.connect();
+  } catch (e) {
+    status = false;
+    console.error(`Failed to connect to router ${router.name}`, e);
+    routerConnectionError = stringifyError(e);
+  }
+
+  await prisma.routerStatus.create({
+    data: {
+      routerName: router.name,
+      status,
+      error: routerConnectionError,
+    },
+  });
+}
+
+function stringifyError(e: unknown): string {
+  return String(e);
+}

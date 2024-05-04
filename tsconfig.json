@@ -12,6 +12,12 @@
       "path": "apps/server"
     },
     {
+      "path": "apps/services"
+    },
+    {
+      "path": "apps/tg-bot"
+    },
+    {
       "path": "packages/config"
     },
     {
@@ -19,6 +25,9 @@
     },
     {
       "path": "packages/devices"
+    },
+    {
+      "path": "packages/flow"
     },
     {
       "path": "packages/types"

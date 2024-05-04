@@ -1,5 +1,5 @@
 {
-  "name": "ts-monorepo",
+  "name": "home-tg-bot",
   "private": true,
   "scripts": {
     "postinstall": "update-ts-references",
@@ -9,9 +9,11 @@
     "lint": "yarn eslint .",
     "test": "jest --runInBand --detectOpenHandles --no-cache",
     "test:watch": "jest --watch --detectOpenHandles --runInBand --watchAll --no-cache",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "prisma:sync": "yarn workspace @packages/db prisma generate && env-cmd -f '.env' yarn workspace @packages/db prisma db push && yarn build && echo 'done!'",
+    "prisma:studio": "env-cmd -f '.env' yarn workspace @packages/db prisma studio"
   },
-  "packageManager": "yarn@4.1.1",
+  "packageManager": "yarn@4.2.1",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -20,6 +22,7 @@
     "@eslint/js": "^8.56.0",
     "@types/jest": "^29.5.12",
     "@types/node": "^20.12.7",
+    "env-cmd": "^10.1.0",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",
     "jest": "^29.7.0",
