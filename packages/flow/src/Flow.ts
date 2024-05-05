@@ -7,14 +7,7 @@ export class Flow<IQueueData = void> {
   public queueName: string;
   public worker?: Worker;
 
-  constructor({
-    name,
-    queueOpts,
-  }: {
-    name: string;
-    queueOpts?: QueueOptions;
-    workerOpts?: WorkerOptions;
-  }) {
+  constructor({ name, queueOpts }: { name: string; queueOpts?: QueueOptions }) {
     this.queueName = name;
     this.queue = new Queue<IQueueData>(name, {
       ...queueOpts,

@@ -27,4 +27,6 @@ export const defaultConfig: IConfig = {
     port: 6379,
   },
   routers,
+  dhcpLeasesFetchTimeout: 5000,
+  dhcpLeasesFetchCount: 12,
 };

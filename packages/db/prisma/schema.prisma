@@ -24,18 +24,14 @@ model TgChat {
 model DhcpLease {
   id                String             @id @default(uuid())
   name              String
-  ownerName         String?
   dhcpName          String
   dhcpIp            String
   dhcpMac           String             @unique
   dhcpDesc          String?
   watch             Boolean            @default(false)
-  lastStatus        Boolean
-  lastConnected     DateTime           @default(now())
-  lastDisconnected  DateTime           @default(now())
+  router            String
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
-  router            String
   DhcpLeaseHistory  DhcpLeaseHistory[]
   DhcpLeaseStatuses DhcpLeaseStatus[]
 }
@@ -52,10 +48,10 @@ model RouterStatus {
 model DhcpLeaseHistory {
   id          String    @id @default(uuid())
   dhcpLeaseId String
-  dhcpLease   DhcpLease @relation(fields: [dhcpLeaseId], references: [id])
   status      Boolean
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  dhcpLease   DhcpLease @relation(fields: [dhcpLeaseId], references: [id])
 }
 
 model DhcpLeaseStatus {

@@ -12,4 +12,6 @@ export interface IConfig {
   };
   redis: ConnectionOptions;
   routers: IRouterConfig[];
+  dhcpLeasesFetchTimeout: number;
+  dhcpLeasesFetchCount: number;
 }
